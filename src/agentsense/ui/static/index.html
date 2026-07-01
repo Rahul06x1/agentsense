@@ -62,6 +62,14 @@
     .cell.missing { color: var(--muted); font-style: italic; }
     .idx { color: var(--muted); text-align: right; padding: 6px 4px; }
     .idx.diverge { color: #ff8a8a; font-weight: 700; }
+    .replay-box { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+      padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+    .replay-box select, .replay-box input { background: var(--bg); color: var(--fg);
+      border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font: inherit; }
+    .replay-box input { min-width: 180px; }
+    .replay-box button { background: var(--accent); color: #0b0e13; border: 0; border-radius: 6px;
+      padding: 5px 12px; cursor: pointer; font: inherit; font-weight: 600; }
+    .rp-status { color: var(--muted); font-size: 11px; }
   </style>
 </head>
 <body>
@@ -113,18 +121,15 @@
       return { text: "✓ final answer", cls: "" };
     }
 
-    async function doCompare() {
-      const a = document.getElementById("cmp-a").value;
-      const b = document.getElementById("cmp-b").value;
-      const res = document.getElementById("cmp-result");
-      const d = await (await fetch(`/api/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`)).json();
-
+    function diffGridHTML(d) {
+      const headA = d.a.label || d.a.model_id || d.a.trace_id;
+      const headB = d.b.label || d.b.model_id || d.b.trace_id;
       const n = Math.max(d.a.decisions.length, d.b.decisions.length);
       const div = d.first_divergence;
       let rows = `<div class="diff-grid">
         <div class="diff-head"></div>
-        <div class="diff-head">${d.a.model_id || d.a.trace_id}</div>
-        <div class="diff-head">${d.b.model_id || d.b.trace_id}</div>`;
+        <div class="diff-head">${headA}</div>
+        <div class="diff-head">${headB}</div>`;
       for (let i = 0; i < n; i++) {
         const la = decisionLabel(d.a.decisions[i]);
         const lb = decisionLabel(d.b.decisions[i]);
@@ -136,7 +141,37 @@
       }
       rows += `</div>`;
       const cls = d.aligned ? "aligned" : "diverge";
-      res.innerHTML = `<div class="summary ${cls}">${d.summary}</div>` + rows;
+      return `<div class="summary ${cls}">${d.summary}</div>` + rows;
+    }
+
+    async function doCompare() {
+      const a = document.getElementById("cmp-a").value;
+      const b = document.getElementById("cmp-b").value;
+      const d = await (await fetch(`/api/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`)).json();
+      document.getElementById("cmp-result").innerHTML = diffGridHTML(d);
+    }
+
+    async function runReplay(traceId) {
+      const status = document.getElementById("rp-status");
+      const model = document.getElementById("rp-model").value.trim();
+      if (!model) { status.textContent = "enter a model id"; return; }
+      const body = {
+        trace_id: traceId,
+        adapter: document.getElementById("rp-adapter").value,
+        model,
+        base_url: document.getElementById("rp-baseurl").value.trim() || null,
+      };
+      status.textContent = "replaying…";
+      const resp = await fetch("/api/replay", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await resp.json();
+      if (!resp.ok) { status.textContent = "error: " + (d.detail || resp.status); return; }
+      const u = d.replay;
+      status.textContent = `done · ${u.input_tokens}/${u.output_tokens} tok`
+        + (u.stopped_reason ? ` · ${u.stopped_reason}` : "");
+      document.getElementById("rp-result").innerHTML = diffGridHTML(d);
     }
 
     async function loadTraces() {
@@ -182,6 +217,23 @@
         <div class="traceid">${spans.length} spans · ${fmtMs(span_ms)} · 🔒 ${data.redaction_count} redactions</div>
         <div style="height:12px"></div>`;
 
+      // Live replay is only possible for traces that captured the model conversation.
+      const replayable = spans.some(s => s.kind === "llm_call");
+      const replayBox = replayable ? `
+        <div class="replay-box">
+          <span>Replay with</span>
+          <select id="rp-adapter">
+            <option value="openai">OpenAI-compatible / Ollama</option>
+            <option value="bedrock">AWS Bedrock</option>
+          </select>
+          <input id="rp-model" placeholder="model id (e.g. gpt-4o-mini)" />
+          <input id="rp-baseurl" placeholder="base URL (optional, e.g. Ollama)" />
+          <button onclick="runReplay('${data.trace_id}')">Run replay</button>
+          <span id="rp-status" class="rp-status"></span>
+        </div>
+        <div id="rp-result"></div>
+        <div style="height:12px"></div>` : "";
+
       const rows = spans.map(s => {
         const left = ((s.ts_start - t0) * 1000 / span_ms) * 100;
         const width = ((s.latency_ms ?? 0) / span_ms) * 100;
@@ -198,7 +250,7 @@
         </div>`;
       }).join("");
 
-      detail.innerHTML = header + rows;
+      detail.innerHTML = header + replayBox + rows;
     }
 
     loadTraces();

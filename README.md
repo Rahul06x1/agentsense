@@ -90,8 +90,16 @@ uv run agentsense ui --db traces.db        # opens http://127.0.0.1:8000
 The **Compare** tab renders the side-by-side trajectory diff: pick two captured traces
 and see their decision sequences aligned, with the first point of divergence highlighted.
 
-Endpoints: `GET /api/traces`, `GET /api/traces/{id}/spans`, `GET /api/diff?a=&b=`. The
-frontend is plain HTML/JS in `ui/static/` — swappable for React later behind the same API.
+**Live replay** — on any captured trace, pick a model and re-run it right there: agentsense
+rebuilds the recording, replays it against your chosen model (OpenAI-compatible/Ollama or
+AWS Bedrock), and diffs the result against what the agent actually did. Ephemeral — no
+store writes.
+
+![Live replay: re-run a captured trace against a model and diff the result](docs/img/live-replay.png)
+
+Endpoints: `GET /api/traces`, `GET /api/traces/{id}/spans`, `GET /api/diff?a=&b=`,
+`POST /api/replay`. The frontend is plain HTML/JS in `ui/static/` — swappable for React
+later behind the same API.
 
 ## Capture SDK
 

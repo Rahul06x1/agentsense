@@ -14,12 +14,30 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-from agentsense.replay import Trajectory, captured_trajectory, diff_trajectories
+from agentsense.replay import (
+    BedrockAdapter,
+    OpenAICompatAdapter,
+    Recording,
+    Trajectory,
+    captured_trajectory,
+    diff_trajectories,
+    replay,
+)
 from agentsense.replay.trajectory import TOOL_CALL
 from agentsense.store.sqlite import SpanStore
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+class ReplayRequest(BaseModel):
+    trace_id: str
+    model: str
+    adapter: str = "openai"  # "openai" (OpenAI-compatible/Ollama) or "bedrock"
+    base_url: str | None = None
+    api_key: str | None = None
+    region: str = "eu-west-1"
 
 
 def create_app(db_path: str) -> FastAPI:
@@ -70,6 +88,62 @@ def create_app(db_path: str) -> FastAPI:
             "aligned": result.aligned,
             "first_divergence": result.first_divergence,
             "summary": result.summary,
+        }
+
+    @app.post("/api/replay")
+    def replay_trace(req: ReplayRequest) -> dict[str, Any]:
+        """Live-replay a captured trace against a chosen model, return the diff.
+
+        Ephemeral: makes an outbound model call but does NOT write to the store.
+        Only traces with llm_call spans can be rebuilt into a recording.
+        """
+        store = _store()
+        try:
+            if not store.spans_for_trace(req.trace_id):
+                raise HTTPException(status_code=404, detail="trace not found")
+            try:
+                recording = Recording.from_sdk_trace(store, req.trace_id)
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"cannot rebuild a replayable recording from this trace: {e}",
+                ) from e
+            captured = captured_trajectory(store, req.trace_id)
+        finally:
+            store.close()
+
+        if req.adapter == "bedrock":
+            adapter = BedrockAdapter(model_id=req.model, region=req.region)
+        else:
+            adapter = OpenAICompatAdapter(
+                model_id=req.model, base_url=req.base_url, api_key=req.api_key
+            )
+
+        try:
+            replayed = replay(recording, adapter)
+        except ModuleNotFoundError as e:  # adapter SDK not installed
+            raise HTTPException(
+                status_code=400,
+                detail=f"adapter '{req.adapter}' needs the 'replay' extra ({e.name})",
+            ) from e
+        except Exception as e:  # noqa: BLE001 - surface model/credential errors to the UI
+            raise HTTPException(status_code=502, detail=f"model call failed: {e}") from e
+
+        result = diff_trajectories(captured, replayed)
+        return {
+            "a": {"label": f"captured · {captured.model_id or 'agent'}",
+                  "decisions": _decisions(captured)},
+            "b": {"label": f"replay · {adapter.model_id}",
+                  "decisions": _decisions(replayed)},
+            "aligned": result.aligned,
+            "first_divergence": result.first_divergence,
+            "summary": result.summary,
+            "replay": {
+                "model": adapter.model_id,
+                "stopped_reason": replayed.stopped_reason,
+                "input_tokens": replayed.total_input_tokens,
+                "output_tokens": replayed.total_output_tokens,
+            },
         }
 
     # Serve the single-page frontend. Registered AFTER the API routes so /api/*
