@@ -109,6 +109,18 @@ engine speaks only provider-neutral types — swapping providers never touches i
 tool results can be supplied directly or pulled from a captured proxy trace via
 `Recording.from_trace_store(...)`.
 
+### Capture → replay (the full loop)
+
+An SDK-captured run replays end-to-end: `Recording.from_sdk_trace(store, trace_id)`
+reconstructs the question, tools, model, and recorded tool results, and
+`captured_trajectory(store, trace_id)` reconstructs what the agent *actually did*. Diff
+the two to answer "would a different model have decided differently than my agent did?"
+
+```bash
+uv run python examples/capture_then_replay.py
+# → diverge at decision 0: claude-haiku-4-5 → call get_weather(...) | rushed-model → final answer
+```
+
 ## Model access (live replay only — not needed for the proxy)
 
 Live replay uses AWS Bedrock (Converse API) for dev, OpenAI-compatible for the OSS

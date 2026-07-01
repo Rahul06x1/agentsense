@@ -12,6 +12,7 @@ from tracekit.replay.adapters import (
     OpenAICompatAdapter,
     ScriptedAdapter,
 )
+from tracekit.replay.capture import captured_trajectory
 from tracekit.replay.diff import TrajectoryDiff, diff_trajectories
 from tracekit.replay.engine import replay
 from tracekit.replay.recording import Recording
@@ -28,6 +29,7 @@ from tracekit.replay.types import (
 __all__ = [
     "replay",
     "Recording",
+    "captured_trajectory",
     "Trajectory",
     "Step",
     "diff_trajectories",
