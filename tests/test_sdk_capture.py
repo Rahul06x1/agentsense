@@ -1,8 +1,8 @@
 """Capture SDK: session tree, span kinds, parent links, timing."""
 
-from tracekit.model.spans import LLM_CALL, REASONING, SESSION, TOOL_CALL
-from tracekit.sdk import Tracer
-from tracekit.store.sqlite import SpanStore
+from agentsense.model.spans import LLM_CALL, REASONING, SESSION, TOOL_CALL
+from agentsense.sdk import Tracer
+from agentsense.store.sqlite import SpanStore
 
 
 def test_session_produces_rooted_tree(tmp_path):

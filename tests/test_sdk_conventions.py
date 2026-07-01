@@ -1,15 +1,15 @@
 """Capture SDK: OTel GenAI attributes on llm_call spans + usage capture."""
 
-from tracekit.model.spans import LLM_CALL
-from tracekit.sdk import Tracer
-from tracekit.sdk.conventions import (
+from agentsense.model.spans import LLM_CALL
+from agentsense.sdk import Tracer
+from agentsense.sdk.conventions import (
     CACHE_READ_INPUT_TOKENS,
     GEN_AI_REQUEST_MODEL,
     GEN_AI_SYSTEM,
     GEN_AI_USAGE_INPUT_TOKENS,
     infer_system,
 )
-from tracekit.store.sqlite import SpanStore
+from agentsense.store.sqlite import SpanStore
 
 
 def test_llm_call_carries_genai_attributes(tmp_path):
@@ -30,7 +30,7 @@ def test_llm_call_carries_genai_attributes(tmp_path):
     assert a[GEN_AI_SYSTEM] == "anthropic"
     assert a[GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert a[CACHE_READ_INPUT_TOKENS] == 4
-    assert a["tracekit.cost_usd"] == 0.0001
+    assert a["agentsense.cost_usd"] == 0.0001
     # Conversation stored whole (replayable): messages + tools + response survive.
     assert llm.request["messages"][0]["content"] == "hi"
     assert llm.request["tools"][0]["name"] == "x"

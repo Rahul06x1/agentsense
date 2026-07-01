@@ -1,7 +1,7 @@
 """Capture -> replay bridge: an SDK-captured run becomes replayable, and the
 captured trajectory can be diffed against a replay with a different model."""
 
-from tracekit.replay import (
+from agentsense.replay import (
     ModelResponse,
     Recording,
     ScriptedAdapter,
@@ -10,8 +10,8 @@ from tracekit.replay import (
     diff_trajectories,
     replay,
 )
-from tracekit.sdk import Tracer
-from tracekit.store.sqlite import SpanStore
+from agentsense.sdk import Tracer
+from agentsense.store.sqlite import SpanStore
 
 WEATHER_TOOL = {
     "type": "function",

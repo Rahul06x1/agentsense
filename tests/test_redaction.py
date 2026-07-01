@@ -1,6 +1,6 @@
 """Redaction: determinism (Phase 0 row 6) + no plaintext leak + structure fidelity."""
 
-from tracekit.redaction.redactor import redact_object, redact_text
+from agentsense.redaction.redactor import redact_object, redact_text
 
 
 def test_email_deterministic_and_no_leak():

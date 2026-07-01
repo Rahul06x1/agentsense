@@ -6,9 +6,9 @@ pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from tracekit.sdk import Tracer  # noqa: E402
-from tracekit.store.sqlite import SpanStore  # noqa: E402
-from tracekit.ui.app import create_app  # noqa: E402
+from agentsense.sdk import Tracer  # noqa: E402
+from agentsense.store.sqlite import SpanStore  # noqa: E402
+from agentsense.ui.app import create_app  # noqa: E402
 
 
 def _run(store, trace_id, *, call_tool):

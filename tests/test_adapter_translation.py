@@ -5,8 +5,8 @@ translation + parsing (incl. Bedrock usage/metrics capture) without SSO/Bedrock.
 
 from types import SimpleNamespace
 
-from tracekit.replay import BedrockAdapter, OpenAICompatAdapter, ToolSpec, Turn
-from tracekit.replay.types import ToolCall, ToolResult
+from agentsense.replay import BedrockAdapter, OpenAICompatAdapter, ToolSpec, Turn
+from agentsense.replay.types import ToolCall, ToolResult
 
 WEATHER = ToolSpec("get_weather", "weather", {"type": "object",
                                               "properties": {"city": {"type": "string"}}})

@@ -2,7 +2,7 @@
 
 Uses the scripted adapter so it runs offline (no Bedrock/SSO)."""
 
-from tracekit.replay import (
+from agentsense.replay import (
     ModelResponse,
     Recording,
     ScriptedAdapter,
@@ -10,7 +10,7 @@ from tracekit.replay import (
     ToolSpec,
     replay,
 )
-from tracekit.replay.trajectory import FINAL, TOOL_CALL, TOOL_RESULT
+from agentsense.replay.trajectory import FINAL, TOOL_CALL, TOOL_RESULT
 
 WEATHER_TOOL = ToolSpec(
     name="get_weather",
@@ -78,7 +78,7 @@ def test_no_tool_path_returns_final_immediately():
 
 
 def test_usage_incl_cache_tokens_captured():
-    from tracekit.replay.types import Usage
+    from agentsense.replay.types import Usage
 
     script = [ModelResponse(text="ok", usage=Usage(input_tokens=10, output_tokens=3,
                                                    cache_read_input_tokens=4))]

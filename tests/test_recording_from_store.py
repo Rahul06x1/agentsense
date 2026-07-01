@@ -1,8 +1,8 @@
 """Recording.from_trace_store: a captured proxy trace becomes a replayable recording."""
 
-from tracekit.model.spans import Span
-from tracekit.replay import ModelResponse, Recording, ScriptedAdapter, ToolCall, replay
-from tracekit.store.sqlite import SpanStore
+from agentsense.model.spans import Span
+from agentsense.replay import ModelResponse, Recording, ScriptedAdapter, ToolCall, replay
+from agentsense.store.sqlite import SpanStore
 
 
 def _write_tool_call(store: SpanStore, trace_id: str, name: str, args: dict, result: dict):

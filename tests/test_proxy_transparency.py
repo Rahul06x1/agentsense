@@ -19,18 +19,18 @@ async def test_client_drives_filesystem_through_proxy(tmp_path):
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 
-    from tracekit.store.sqlite import SpanStore
+    from agentsense.store.sqlite import SpanStore
 
     allowed = tmp_path / "workspace"
     allowed.mkdir()
-    (allowed / "hello.txt").write_text("hello from tracekit")
+    (allowed / "hello.txt").write_text("hello from agentsense")
     db = tmp_path / "trace.db"
 
     # The client launches the PROXY; the proxy launches the real server.
     server_params = StdioServerParameters(
         command=sys.executable,
         args=[
-            "-m", "tracekit.cli", "proxy",
+            "-m", "agentsense.cli", "proxy",
             "--db", str(db), "--trace-id", "itest",
             "--", "npx", "-y", "@modelcontextprotocol/server-filesystem", str(allowed),
         ],

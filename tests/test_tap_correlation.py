@@ -2,8 +2,8 @@
 
 import json
 
-from tracekit.proxy.tap import TraceTap
-from tracekit.store.sqlite import SpanStore
+from agentsense.proxy.tap import TraceTap
+from agentsense.store.sqlite import SpanStore
 
 
 def _line(obj: dict) -> bytes:

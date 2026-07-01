@@ -6,10 +6,10 @@ pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from tracekit.model.spans import Span  # noqa: E402
-from tracekit.sdk import Tracer  # noqa: E402
-from tracekit.store.sqlite import SpanStore  # noqa: E402
-from tracekit.ui.app import create_app  # noqa: E402
+from agentsense.model.spans import Span  # noqa: E402
+from agentsense.sdk import Tracer  # noqa: E402
+from agentsense.store.sqlite import SpanStore  # noqa: E402
+from agentsense.ui.app import create_app  # noqa: E402
 
 
 def _seed(db_path):
@@ -62,4 +62,4 @@ def test_missing_trace_404(tmp_path):
 def test_index_page_served(tmp_path):
     r = _client(tmp_path).get("/")
     assert r.status_code == 200
-    assert "tracekit" in r.text and "trace explorer" in r.text
+    assert "agentsense" in r.text and "trace explorer" in r.text

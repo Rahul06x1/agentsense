@@ -4,13 +4,13 @@ Records one tool result, then replays the SAME question against two models and
 diffs their decision trajectories. No live tool ever fires during replay.
 
 Prereqs (temporary SSO creds — re-run when they expire):
-    aws sso login --profile coredev
-    export AWS_PROFILE=coredev AWS_REGION=eu-west-1
+    aws sso login --profile <your-aws-profile>
+    export AWS_PROFILE=<your-aws-profile> AWS_REGION=eu-west-1
 Then:
     uv run --extra replay python examples/replay_bedrock.py
 """
 
-from tracekit.replay import (
+from agentsense.replay import (
     BedrockAdapter,
     Recording,
     ToolSpec,

@@ -9,7 +9,7 @@ different model have decided differently, given the same tool outputs?"
 import tempfile
 from pathlib import Path
 
-from tracekit.replay import (
+from agentsense.replay import (
     ModelResponse,
     Recording,
     ScriptedAdapter,
@@ -17,8 +17,8 @@ from tracekit.replay import (
     diff_trajectories,
     replay,
 )
-from tracekit.sdk import Tracer
-from tracekit.store import SpanStore
+from agentsense.sdk import Tracer
+from agentsense.store import SpanStore
 
 WEATHER = {"type": "function", "function": {
     "name": "get_weather", "description": "current weather",

@@ -1,9 +1,23 @@
 [project]
-name = "tracekit"
-version = "0.0.0"
-description = "MCP-native agent observability & debugging tool (v0: proxy)"
+name = "agentsense"
+version = "0.1.0"
+description = "Make sense of what your AI agents did — local-first, MCP-native observability, trace replay & trajectory diff."
 readme = "README.md"
 requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Rahul Rajeev", email = "rahulrajeev2k1@gmail.com" }]
+keywords = [
+    "agents", "observability", "debugging", "mcp", "model-context-protocol",
+    "llm", "tracing", "replay", "ai",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Debuggers",
+    "Topic :: System :: Monitoring",
+]
 dependencies = [
     "pydantic>=2.7",
 ]
@@ -22,7 +36,12 @@ ui = [
 ]
 
 [project.scripts]
-tracekit = "tracekit.cli:main"
+agentsense = "agentsense.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Rahul06x1/agentsense"
+Repository = "https://github.com/Rahul06x1/agentsense"
+Issues = "https://github.com/Rahul06x1/agentsense/issues"
 
 [dependency-groups]
 dev = [

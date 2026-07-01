@@ -4,7 +4,7 @@ Two "models" (scripted) replay the same recorded tool results; the diff shows
 where their decisions diverge. Run:  uv run python examples/replay_scripted.py
 """
 
-from tracekit.replay import (
+from agentsense.replay import (
     ModelResponse,
     Recording,
     ScriptedAdapter,

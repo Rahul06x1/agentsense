@@ -6,8 +6,8 @@ Offline, no creds:  uv run python examples/sdk_capture.py
 import tempfile
 from pathlib import Path
 
-from tracekit.sdk import Tracer
-from tracekit.store import SpanStore
+from agentsense.sdk import Tracer
+from agentsense.store import SpanStore
 
 db = Path(tempfile.mkdtemp()) / "traces.db"
 store = SpanStore(db)

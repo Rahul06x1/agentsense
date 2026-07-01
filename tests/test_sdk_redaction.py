@@ -1,8 +1,8 @@
 """Capture SDK shares the proxy's redaction code path — PII never persists raw."""
 
-from tracekit.model.spans import LLM_CALL, REASONING, TOOL_CALL
-from tracekit.sdk import Tracer
-from tracekit.store.sqlite import SpanStore
+from agentsense.model.spans import LLM_CALL, REASONING, TOOL_CALL
+from agentsense.sdk import Tracer
+from agentsense.store.sqlite import SpanStore
 
 
 def test_pii_in_sdk_spans_is_redacted(tmp_path):

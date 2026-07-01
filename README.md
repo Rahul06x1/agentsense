@@ -1,11 +1,12 @@
-# tracekit
+# agentsense
 
-MCP-native agent observability & debugging tool. **v0** ships the differentiator
-first: a transparent MCP proxy that traces every protocol message with **zero code
-change to the agent**, redacts PII deterministically on the write path, and stores
-whole message objects (no field whitelist) in local SQLite.
+**Make sense of what your AI agents did.** A local-first, MCP-native observability &
+debugging tool: a transparent MCP proxy traces every protocol message with **zero code
+change to the agent**, PII is redacted deterministically on the write path, and traces
+are stored whole (no field whitelist) in local SQLite — then **replayed and diffed** to
+see how a different model would have decided.
 
-> Working name — see `../mbo-architecture.md` for the design and locked v0 scope.
+*Apache-2.0 · local-first · no cloud signup*
 
 ## Aim
 
@@ -18,7 +19,7 @@ and documented architecture — a debugger for AI agents that runs entirely on y
 ## Why it's useful
 
 When an AI agent misbehaves — wrong tool, bad decision, runaway cost — you are usually
-guessing. tracekit gives you ground truth:
+guessing. agentsense gives you ground truth:
 
 - **Protocol-level tracing with zero code change.** Point the agent's MCP config at the
   proxy and every tool call, input/output, latency, and cost is captured — even for
@@ -56,7 +57,7 @@ uv sync --group dev
 
 # Point your MCP client's server config at this command instead of the real server.
 # The proxy forwards transparently and traces to SQLite.
-uv run tracekit proxy --db traces.db -- \
+uv run agentsense proxy --db traces.db -- \
     npx -y @modelcontextprotocol/server-filesystem /tmp
 ```
 
@@ -77,7 +78,7 @@ API and a single static page (trace list → span tree + timeline + redaction ba
 
 ```bash
 uv sync --extra ui
-uv run tracekit ui --db traces.db        # opens http://127.0.0.1:8000
+uv run agentsense ui --db traces.db        # opens http://127.0.0.1:8000
 ```
 
 The **Compare** tab renders the side-by-side trajectory diff: pick two captured traces
@@ -93,8 +94,8 @@ see. It writes through the same store — and therefore the same redaction path 
 proxy, using OpenTelemetry GenAI attribute naming (`gen_ai.*`) for interop.
 
 ```python
-from tracekit.sdk import Tracer
-from tracekit.store import SpanStore
+from agentsense.sdk import Tracer
+from agentsense.store import SpanStore
 
 tracer = Tracer(SpanStore("traces.db"))
 with tracer.session("booking-agent") as s:
@@ -144,7 +145,16 @@ Live replay uses AWS Bedrock (Converse API) for dev, OpenAI-compatible for the O
 release. Before running the Bedrock example:
 
 ```bash
-aws sso login --profile coredev        # temporary SSO creds
-export AWS_PROFILE=coredev AWS_REGION=eu-west-1
+aws sso login --profile <your-aws-profile>        # temporary SSO creds
+export AWS_PROFILE=<your-aws-profile> AWS_REGION=eu-west-1
 uv run --extra replay python examples/replay_bedrock.py
 ```
+
+## Contributing
+
+Issues and PRs welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md). All tests run offline
+(`uv run pytest`); the proxy has no model dependency.
+
+## License
+
+[Apache License 2.0](./LICENSE) — includes an explicit patent grant.

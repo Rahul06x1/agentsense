@@ -1,8 +1,8 @@
 """Store: whole objects (incl. unknown/vendor fields) survive persistence (row 8),
 and redaction runs on the write path."""
 
-from tracekit.model.spans import Span
-from tracekit.store.sqlite import SpanStore
+from agentsense.model.spans import Span
+from agentsense.store.sqlite import SpanStore
 
 
 def _bedrock_like_response() -> dict:

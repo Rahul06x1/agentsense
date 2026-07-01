@@ -1,6 +1,6 @@
 """Trajectory diff: same recorded results, two models, find first divergence."""
 
-from tracekit.replay import (
+from agentsense.replay import (
     ModelResponse,
     Recording,
     ScriptedAdapter,
