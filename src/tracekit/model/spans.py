@@ -19,6 +19,14 @@ def _new_id() -> str:
     return uuid.uuid4().hex
 
 
+# Span kinds. mcp_call comes from the proxy; the rest come from the capture SDK.
+MCP_CALL = "mcp_call"
+SESSION = "session"
+REASONING = "reasoning"
+TOOL_CALL = "tool_call"
+LLM_CALL = "llm_call"
+
+
 class RedactionEvent(BaseModel):
     """One redaction action, for the audit trail (what type, where)."""
 
@@ -38,12 +46,16 @@ class Span(BaseModel):
     span_id: str = Field(default_factory=_new_id)
     trace_id: str
     parent_span_id: str | None = None
-    kind: str = "mcp_call"
+    kind: str = MCP_CALL
+    name: str | None = None  # human label: session/step/tool/model-op name
 
     # MCP / JSON-RPC identity
     jsonrpc_id: str | None = None
     method: str | None = None
     tool_name: str | None = None
+
+    # Free-form attributes (SDK uses OTel GenAI conventions, e.g. gen_ai.request.model)
+    attributes: dict[str, Any] = Field(default_factory=dict)
 
     # Timing (epoch seconds; latency in ms)
     ts_start: float = Field(default_factory=time.time)
@@ -61,3 +73,8 @@ class Span(BaseModel):
     def close(self, ts_end: float | None = None) -> None:
         self.ts_end = ts_end if ts_end is not None else time.time()
         self.latency_ms = (self.ts_end - self.ts_start) * 1000.0
+
+    def set_latency(self, latency_ms: float) -> None:
+        """Close the span with a known latency (e.g. reported by the model API)."""
+        self.latency_ms = latency_ms
+        self.ts_end = self.ts_start + latency_ms / 1000.0

@@ -39,7 +39,7 @@ guessing. tracekit gives you ground truth:
 | Deterministic PII redaction | `redaction/` | ✅ write-path |
 | SQLite trace store (whole objects) | `store/` | ✅ |
 | Mocked replay + trajectory diff | `replay/` | ✅ pluggable model client |
-| Python capture SDK | `sdk/` | fast-follow |
+| Python capture SDK | `sdk/` | ✅ OTel GenAI conventions |
 
 ## Design rules (proven in Phase 0, enforced here)
 
@@ -68,6 +68,28 @@ uv run ruff check .
 
 `test_proxy_transparency.py` is an integration test that drives `server-filesystem`
 through the proxy with a real MCP client; it self-skips if `npx` is unavailable.
+
+## Capture SDK
+
+For agents you *can* instrument, the SDK records reasoning-level detail the proxy can't
+see. It writes through the same store — and therefore the same redaction path — as the
+proxy, using OpenTelemetry GenAI attribute naming (`gen_ai.*`) for interop.
+
+```python
+from tracekit.sdk import Tracer
+from tracekit.store import SpanStore
+
+tracer = Tracer(SpanStore("traces.db"))
+with tracer.session("booking-agent") as s:
+    s.step("plan", reasoning=..., model="claude-opus-4-8")
+    s.llm_call("claude-opus-4-8", messages=[...], response={...},
+               usage={"input_tokens": 1200, "output_tokens": 80})
+    s.tool_call("search_flights", args={...}, result={...}, cost=0.002)
+```
+
+Spans form a shallow tree (session → steps). `llm_call` stores the whole conversation
+(messages, tools, response) so a captured run can be reconstructed into a replayable
+`Recording`. Demo: `uv run python examples/sdk_capture.py`.
 
 ## Replay + trajectory diff
 

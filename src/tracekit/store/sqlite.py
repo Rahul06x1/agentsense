@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS spans (
     trace_id       TEXT NOT NULL,
     parent_span_id TEXT,
     kind           TEXT,
+    name           TEXT,
     jsonrpc_id     TEXT,
     method         TEXT,
     tool_name      TEXT,
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS spans (
     request_json   TEXT,
     response_json  TEXT,
     error_json     TEXT,
+    attributes_json TEXT,
     redactions_json TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_spans_trace ON spans(trace_id);
@@ -62,19 +64,23 @@ class SpanStore:
         if span.error is not None:
             span.error, hits = redact_object(span.error)
             audit.extend(hits)
+        if span.attributes:
+            span.attributes, hits = redact_object(span.attributes)
+            audit.extend(hits)
         span.redactions = audit
 
         self._conn.execute(
             """INSERT OR REPLACE INTO spans (
-                span_id, trace_id, parent_span_id, kind, jsonrpc_id, method,
+                span_id, trace_id, parent_span_id, kind, name, jsonrpc_id, method,
                 tool_name, ts_start, ts_end, latency_ms,
-                request_json, response_json, error_json, redactions_json
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                request_json, response_json, error_json, attributes_json, redactions_json
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 span.span_id,
                 span.trace_id,
                 span.parent_span_id,
                 span.kind,
+                span.name,
                 span.jsonrpc_id,
                 span.method,
                 span.tool_name,
@@ -84,6 +90,7 @@ class SpanStore:
                 _dumps(span.request),
                 _dumps(span.response),
                 _dumps(span.error),
+                _dumps(span.attributes),
                 json.dumps([e.model_dump() for e in span.redactions]),
             ),
         )
@@ -122,6 +129,7 @@ def _row_to_span(cur: sqlite3.Cursor, row: tuple) -> Span:
         trace_id=data["trace_id"],
         parent_span_id=data["parent_span_id"],
         kind=data["kind"],
+        name=data["name"],
         jsonrpc_id=data["jsonrpc_id"],
         method=data["method"],
         tool_name=data["tool_name"],
@@ -131,5 +139,6 @@ def _row_to_span(cur: sqlite3.Cursor, row: tuple) -> Span:
         request=_loads(data["request_json"]),
         response=_loads(data["response_json"]),
         error=_loads(data["error_json"]),
+        attributes=_loads(data["attributes_json"]) or {},
         redactions=_loads(data["redactions_json"]) or [],
     )
