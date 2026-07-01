@@ -8,7 +8,7 @@ see how a different model would have decided.
 
 *Apache-2.0 · local-first · no cloud signup*
 
-![Replay-diff: two models over the same recorded tool results, diverging at the first decision](docs/img/compare.png)
+![Replay-diff: two models over the same recorded tool results, diverging at the first decision](https://raw.githubusercontent.com/Rahul06x1/agentsense/main/docs/img/compare.png)
 
 > *Compare view — the same run replayed against two models; the first point where their decisions diverge is highlighted.*
 
@@ -80,7 +80,7 @@ through the proxy with a real MCP client; it self-skips if `npx` is unavailable.
 A read-only web app over the trace store — no build step, no Node. It serves a JSON
 API and a single static page (trace list → span tree + timeline + redaction badges).
 
-![Trace explorer: span tree, timeline, and redaction badges](docs/img/explorer.png)
+![Trace explorer: span tree, timeline, and redaction badges](https://raw.githubusercontent.com/Rahul06x1/agentsense/main/docs/img/explorer.png)
 
 ```bash
 uv sync --extra ui
@@ -95,7 +95,7 @@ rebuilds the recording, replays it against your chosen model (OpenAI-compatible/
 AWS Bedrock), and diffs the result against what the agent actually did. Ephemeral — no
 store writes.
 
-![Live replay: re-run a captured trace against a model and diff the result](docs/img/live-replay.png)
+![Live replay: re-run a captured trace against a model and diff the result](https://raw.githubusercontent.com/Rahul06x1/agentsense/main/docs/img/live-replay.png)
 
 Endpoints: `GET /api/traces`, `GET /api/traces/{id}/spans`, `GET /api/diff?a=&b=`,
 `POST /api/replay`. The frontend is plain HTML/JS in `ui/static/` — swappable for React
