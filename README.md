@@ -54,6 +54,16 @@ guessing. agentsense gives you ground truth:
 - Trace store preserves **unknown/vendor fields** — whole objects, no whitelist.
 - Redaction is **deterministic** (hash-derived tokens) so replay aligns.
 
+## Install
+
+```bash
+pip install agentsense-ai            # distribution name; the CLI and import are `agentsense`
+# extras: pip install "agentsense-ai[ui,replay]"   # web UI + live-replay model clients
+```
+
+The install/import names differ (like `scikit-learn` → `sklearn`): the package is
+`agentsense-ai`, but you run `agentsense …` and `import agentsense`.
+
 ## Quick start
 
 ```bash

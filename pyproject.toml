@@ -1,5 +1,7 @@
 [project]
-name = "agentsense"
+# PyPI distribution name (import package and CLI stay `agentsense`); the bare
+# `agentsense` name is blocked on PyPI as too similar to the existing `agent-sense`.
+name = "agentsense-ai"
 version = "0.1.0"
 description = "Make sense of what your AI agents did — local-first, MCP-native observability, trace replay & trajectory diff."
 readme = "README.md"
@@ -57,6 +59,11 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# Distribution name (agentsense-ai) differs from the import package (agentsense),
+# so point hatchling at the package explicitly.
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentsense"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
