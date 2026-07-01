@@ -42,12 +42,36 @@
     .lat { text-align: right; color: var(--muted); font-size: 11px; }
     .lock { color: var(--reason); font-size: 11px; margin-left: 6px; }
     .empty { color: var(--muted); padding: 24px; }
+    header nav { margin-left: auto; display: flex; gap: 4px; }
+    header nav button { background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+      border-radius: 6px; padding: 4px 12px; cursor: pointer; font: inherit; }
+    header nav button.active { border-color: var(--accent); color: var(--accent); }
+    .cmp-controls { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .cmp-controls select { background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+      border-radius: 6px; padding: 6px 8px; font: inherit; }
+    .cmp-controls button { background: var(--accent); color: #0b0e13; border: 0; border-radius: 6px;
+      padding: 6px 14px; cursor: pointer; font: inherit; font-weight: 600; }
+    .summary { padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; font-size: 12px; }
+    .summary.aligned { background: #14251a; color: var(--tool); border: 1px solid #1f4030; }
+    .summary.diverge { background: #2a1618; color: #ff8a8a; border: 1px solid #46252a; }
+    .diff-grid { display: grid; grid-template-columns: 40px 1fr 1fr; gap: 8px; align-items: stretch; }
+    .diff-head { color: var(--muted); font-size: 11px; padding: 4px 8px; }
+    .cell { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+    .cell.same { opacity: .7; }
+    .cell.diverge { border-color: #a33; background: #2a1618; }
+    .cell.missing { color: var(--muted); font-style: italic; }
+    .idx { color: var(--muted); text-align: right; padding: 6px 4px; }
+    .idx.diverge { color: #ff8a8a; font-weight: 700; }
   </style>
 </head>
 <body>
   <header>
     <h1>tracekit</h1>
     <span class="sub">local trace explorer · read-only</span>
+    <nav>
+      <button id="nav-explore" class="active" onclick="setMode('explore')">Explorer</button>
+      <button id="nav-compare" onclick="setMode('compare')">Compare</button>
+    </nav>
   </header>
   <div class="layout">
     <div class="list" id="list"><div class="empty">loading traces…</div></div>
@@ -59,8 +83,65 @@
       tool_call: "var(--tool)", reasoning: "var(--reason)", session: "var(--session)" };
     const fmtMs = (ms) => ms == null ? "—" : (ms < 1000 ? ms.toFixed(0) + "ms" : (ms / 1000).toFixed(2) + "s");
 
+    let allTraces = [];
+
+    function setMode(mode) {
+      document.getElementById("nav-explore").classList.toggle("active", mode === "explore");
+      document.getElementById("nav-compare").classList.toggle("active", mode === "compare");
+      const detail = document.getElementById("detail");
+      if (mode === "compare") renderCompare(detail);
+      else detail.innerHTML = '<div class="empty">select a trace</div>';
+    }
+
+    function renderCompare(detail) {
+      const opts = allTraces.map(t =>
+        `<option value="${t.trace_id}">${t.name || t.trace_id}</option>`).join("");
+      detail.innerHTML = `
+        <div class="cmp-controls">
+          <span>A</span><select id="cmp-a">${opts}</select>
+          <span>vs B</span><select id="cmp-b">${opts}</select>
+          <button onclick="doCompare()">Compare trajectories</button>
+        </div>
+        <div id="cmp-result"><div class="empty">pick two traces and compare</div></div>`;
+      if (allTraces[1]) document.getElementById("cmp-b").selectedIndex = 1;
+    }
+
+    function decisionLabel(d) {
+      if (!d) return { text: "—", cls: "missing" };
+      if (d.kind === "tool_call")
+        return { text: `call ${d.tool_name}(${JSON.stringify(d.tool_input)})`, cls: "" };
+      return { text: "✓ final answer", cls: "" };
+    }
+
+    async function doCompare() {
+      const a = document.getElementById("cmp-a").value;
+      const b = document.getElementById("cmp-b").value;
+      const res = document.getElementById("cmp-result");
+      const d = await (await fetch(`/api/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`)).json();
+
+      const n = Math.max(d.a.decisions.length, d.b.decisions.length);
+      const div = d.first_divergence;
+      let rows = `<div class="diff-grid">
+        <div class="diff-head"></div>
+        <div class="diff-head">${d.a.model_id || d.a.trace_id}</div>
+        <div class="diff-head">${d.b.model_id || d.b.trace_id}</div>`;
+      for (let i = 0; i < n; i++) {
+        const la = decisionLabel(d.a.decisions[i]);
+        const lb = decisionLabel(d.b.decisions[i]);
+        const isDiv = i === div;
+        const cellCls = isDiv ? "diverge" : (div === null || i < div ? "same" : "");
+        rows += `<div class="idx ${isDiv ? "diverge" : ""}">${i}</div>
+          <div class="cell ${cellCls} ${la.cls}">${la.text}</div>
+          <div class="cell ${cellCls} ${lb.cls}">${lb.text}</div>`;
+      }
+      rows += `</div>`;
+      const cls = d.aligned ? "aligned" : "diverge";
+      res.innerHTML = `<div class="summary ${cls}">${d.summary}</div>` + rows;
+    }
+
     async function loadTraces() {
       const traces = await (await fetch("/api/traces")).json();
+      allTraces = traces;
       const list = document.getElementById("list");
       if (!traces.length) { list.innerHTML = '<div class="empty">no traces yet</div>'; return; }
       list.innerHTML = "";
@@ -77,6 +158,8 @@
     }
 
     async function selectTrace(id, el) {
+      document.getElementById("nav-explore").classList.add("active");
+      document.getElementById("nav-compare").classList.remove("active");
       document.querySelectorAll(".trace").forEach(x => x.classList.remove("active"));
       if (el) el.classList.add("active");
       const data = await (await fetch(`/api/traces/${encodeURIComponent(id)}/spans`)).json();

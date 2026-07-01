@@ -80,8 +80,11 @@ uv sync --extra ui
 uv run tracekit ui --db traces.db        # opens http://127.0.0.1:8000
 ```
 
-Endpoints: `GET /api/traces`, `GET /api/traces/{id}/spans`. The frontend is plain
-HTML/JS in `ui/static/` — swappable for React later behind the same API.
+The **Compare** tab renders the side-by-side trajectory diff: pick two captured traces
+and see their decision sequences aligned, with the first point of divergence highlighted.
+
+Endpoints: `GET /api/traces`, `GET /api/traces/{id}/spans`, `GET /api/diff?a=&b=`. The
+frontend is plain HTML/JS in `ui/static/` — swappable for React later behind the same API.
 
 ## Capture SDK
 
