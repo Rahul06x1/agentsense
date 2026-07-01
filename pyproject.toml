@@ -1,0 +1,43 @@
+[project]
+name = "tracekit"
+version = "0.0.0"
+description = "MCP-native agent observability & debugging tool (v0: proxy)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+# Bedrock (Converse) for dev; OpenAI-compatible for the eventual OSS release.
+# Not needed for the proxy — only the replay engine (fast-follow).
+replay = [
+    "boto3>=1.43",
+    "openai>=2.0",
+]
+
+[project.scripts]
+tracekit = "tracekit.cli:main"
+
+[dependency-groups]
+dev = [
+    "mcp>=1.28.1",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
