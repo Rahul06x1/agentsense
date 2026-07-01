@@ -40,6 +40,7 @@ guessing. tracekit gives you ground truth:
 | SQLite trace store (whole objects) | `store/` | ✅ |
 | Mocked replay + trajectory diff | `replay/` | ✅ pluggable model client |
 | Python capture SDK | `sdk/` | ✅ OTel GenAI conventions |
+| Local trace-explorer UI | `ui/` | ✅ read-only, FastAPI |
 
 ## Design rules (proven in Phase 0, enforced here)
 
@@ -68,6 +69,19 @@ uv run ruff check .
 
 `test_proxy_transparency.py` is an integration test that drives `server-filesystem`
 through the proxy with a real MCP client; it self-skips if `npx` is unavailable.
+
+## UI (local trace explorer)
+
+A read-only web app over the trace store — no build step, no Node. It serves a JSON
+API and a single static page (trace list → span tree + timeline + redaction badges).
+
+```bash
+uv sync --extra ui
+uv run tracekit ui --db traces.db        # opens http://127.0.0.1:8000
+```
+
+Endpoints: `GET /api/traces`, `GET /api/traces/{id}/spans`. The frontend is plain
+HTML/JS in `ui/static/` — swappable for React later behind the same API.
 
 ## Capture SDK
 

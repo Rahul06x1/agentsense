@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 from tracekit.model.spans import Span
 from tracekit.redaction.redactor import redact_object
@@ -107,6 +108,45 @@ class SpanStore:
             "SELECT * FROM spans WHERE trace_id = ? ORDER BY ts_start", (trace_id,)
         )
         return [_row_to_span(cur, row) for row in cur.fetchall()]
+
+    def list_traces(self) -> list[dict[str, Any]]:
+        """Read-only trace summaries for the UI, newest first."""
+        rows = self._conn.execute(
+            """SELECT trace_id,
+                      COUNT(*)                                  AS span_count,
+                      MIN(ts_start)                             AS started,
+                      MAX(COALESCE(ts_end, ts_start))           AS ended,
+                      GROUP_CONCAT(DISTINCT kind)               AS kinds,
+                      SUM(CASE WHEN kind = 'tool_call' OR method = 'tools/call'
+                               THEN 1 ELSE 0 END)               AS tool_calls
+               FROM spans GROUP BY trace_id"""
+        ).fetchall()
+        names = dict(
+            self._conn.execute(
+                "SELECT trace_id, name FROM spans "
+                "WHERE kind = 'session' AND name IS NOT NULL"
+            ).fetchall()
+        )
+        out: list[dict[str, Any]] = []
+        for trace_id, span_count, started, ended, kinds, tool_calls in rows:
+            duration_ms = (
+                (ended - started) * 1000.0
+                if started is not None and ended is not None
+                else None
+            )
+            out.append(
+                {
+                    "trace_id": trace_id,
+                    "name": names.get(trace_id),
+                    "span_count": span_count,
+                    "tool_calls": tool_calls or 0,
+                    "started": started,
+                    "duration_ms": duration_ms,
+                    "kinds": sorted((kinds or "").split(",")) if kinds else [],
+                }
+            )
+        out.sort(key=lambda t: t["started"] or 0, reverse=True)
+        return out
 
     def close(self) -> None:
         self._conn.close()

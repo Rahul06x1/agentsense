@@ -54,6 +54,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--trace-id", default=None, help="Trace id (default: random)")
     p.add_argument("--log-file", default=None, help="Mirror logs to this file")
 
+    u = sub.add_parser("ui", help="Serve the local read-only trace explorer")
+    u.add_argument("--db", default="tracekit.db", help="SQLite trace store path")
+    u.add_argument("--host", default="127.0.0.1")
+    u.add_argument("--port", type=int, default=8000)
+    u.add_argument("--no-open", action="store_true", help="Do not open a browser")
+
     args = parser.parse_args(our_args)
 
     if args.command == "proxy":
@@ -69,6 +75,23 @@ def main(argv: list[str] | None = None) -> int:
             return asyncio.run(run_stdio_proxy(server_cmd, tap))
         finally:
             store.close()
+
+    if args.command == "ui":
+        try:
+            import uvicorn
+
+            from tracekit.ui.app import create_app
+        except ModuleNotFoundError as e:
+            parser.error(f"the UI needs the 'ui' extra: uv sync --extra ui ({e.name})")
+        url = f"http://{args.host}:{args.port}"
+        if not args.no_open:
+            import threading
+            import webbrowser
+
+            threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+        print(f"tracekit ui → {url}  (db={args.db})", file=sys.stderr)
+        uvicorn.run(create_app(args.db), host=args.host, port=args.port, log_level="warning")
+        return 0
 
     return 1
 
