@@ -7,6 +7,30 @@ whole message objects (no field whitelist) in local SQLite.
 
 > Working name — see `../mbo-architecture.md` for the design and locked v0 scope.
 
+## Aim
+
+Ship an open-source, MCP-native agent observability & debugging tool that combines four
+properties no existing tool has together: **local-first**, **MCP-native** (instruments
+inside the Model Context Protocol, not wrapped via OpenTelemetry), **true trace replay +
+trajectory diff**, and **open source**. The goal is a public release with a working demo
+and documented architecture — a debugger for AI agents that runs entirely on your machine.
+
+## Why it's useful
+
+When an AI agent misbehaves — wrong tool, bad decision, runaway cost — you are usually
+guessing. tracekit gives you ground truth:
+
+- **Protocol-level tracing with zero code change.** Point the agent's MCP config at the
+  proxy and every tool call, input/output, latency, and cost is captured — even for
+  agents you can't instrument.
+- **"Would a different model fix this?"** Replay a recorded trace against another
+  model/prompt, feeding back stored tool results, and diff the trajectory to see exactly
+  where behaviour diverges — no live tool calls, no API cost, no side effects.
+- **Compliance-ready audit trails.** PII is redacted deterministically *before* it is
+  ever stored, and the redaction itself is logged — the audit-trail story for EU AI Act
+  enforcement (from August 2026).
+- **Local-first.** No cloud signup, fully self-hostable.
+
 ## What's here (v0)
 
 | Component | Module | Status |
@@ -14,8 +38,8 @@ whole message objects (no field whitelist) in local SQLite.
 | MCP proxy (stdio, transparent) | `proxy/` | ✅ built first |
 | Deterministic PII redaction | `redaction/` | ✅ write-path |
 | SQLite trace store (whole objects) | `store/` | ✅ |
+| Mocked replay + trajectory diff | `replay/` | ✅ pluggable model client |
 | Python capture SDK | `sdk/` | fast-follow |
-| Mocked replay + trajectory diff | `replay/` | fast-follow |
 
 ## Design rules (proven in Phase 0, enforced here)
 
@@ -45,8 +69,31 @@ uv run ruff check .
 `test_proxy_transparency.py` is an integration test that drives `server-filesystem`
 through the proxy with a real MCP client; it self-skips if `npx` is unavailable.
 
-## Model access (replay only — not needed for the proxy)
+## Replay + trajectory diff
 
-The replay engine (fast-follow) uses a **pluggable** model client: AWS Bedrock
-(Converse API) for dev, OpenAI-compatible for the OSS release. Before running
-replay: `aws sso login --profile coredev` (temporary SSO creds).
+Re-drive an agent run against a different model, **injecting recorded tool results**
+(the engine cannot call a live tool — the guarantee holds by construction), then diff
+the two decision trajectories to find the first point of divergence.
+
+```bash
+# Offline, no creds — two scripted "models" over the same recorded results:
+uv run python examples/replay_scripted.py
+# → diverge at decision 0: haiku-4.5 → call get_weather(...) | opus-4.8 → call get_forecast(...)
+```
+
+The model client is **pluggable behind one adapter** (`replay/adapters/`): `ScriptedAdapter`
+(offline/tests), `BedrockAdapter` (Converse, dev), `OpenAICompatAdapter` (OSS release). The
+engine speaks only provider-neutral types — swapping providers never touches it. Recorded
+tool results can be supplied directly or pulled from a captured proxy trace via
+`Recording.from_trace_store(...)`.
+
+## Model access (live replay only — not needed for the proxy)
+
+Live replay uses AWS Bedrock (Converse API) for dev, OpenAI-compatible for the OSS
+release. Before running the Bedrock example:
+
+```bash
+aws sso login --profile coredev        # temporary SSO creds
+export AWS_PROFILE=coredev AWS_REGION=eu-west-1
+uv run --extra replay python examples/replay_bedrock.py
+```
