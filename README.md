@@ -8,6 +8,10 @@ see how a different model would have decided.
 
 *Apache-2.0 · local-first · no cloud signup*
 
+![Replay-diff: two models over the same recorded tool results, diverging at the first decision](docs/img/compare.png)
+
+> *Compare view — the same run replayed against two models; the first point where their decisions diverge is highlighted.*
+
 ## Aim
 
 Ship an open-source, MCP-native agent observability & debugging tool that combines four
@@ -75,6 +79,8 @@ through the proxy with a real MCP client; it self-skips if `npx` is unavailable.
 
 A read-only web app over the trace store — no build step, no Node. It serves a JSON
 API and a single static page (trace list → span tree + timeline + redaction badges).
+
+![Trace explorer: span tree, timeline, and redaction badges](docs/img/explorer.png)
 
 ```bash
 uv sync --extra ui
