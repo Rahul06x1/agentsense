@@ -12,13 +12,16 @@ see how a different model would have decided.
 
 > *Compare view — the same run replayed against two models; the first point where their decisions diverge is highlighted.*
 
-## Aim
+## What makes it different
 
-Ship an open-source, MCP-native agent observability & debugging tool that combines four
-properties no existing tool has together: **local-first**, **MCP-native** (instruments
-inside the Model Context Protocol, not wrapped via OpenTelemetry), **true trace replay +
-trajectory diff**, and **open source**. The goal is a public release with a working demo
-and documented architecture — a debugger for AI agents that runs entirely on your machine.
+Agent-observability tools each miss at least one of these — agentsense combines all four:
+
+- **Local-first** — runs entirely on your machine; no cloud signup or account.
+- **MCP-native** — instruments inside the Model Context Protocol at the wire, not
+  wrapped via OpenTelemetry, so it traces tool calls with zero code change.
+- **Trace replay + trajectory diff** — re-run a recorded trace against a different
+  model and see exactly where the decisions diverge.
+- **Open source** — Apache-2.0.
 
 ## Why it's useful
 
@@ -36,18 +39,18 @@ guessing. agentsense gives you ground truth:
   enforcement (from August 2026).
 - **Local-first.** No cloud signup, fully self-hostable.
 
-## What's here (v0)
+## What's included
 
 | Component | Module | Status |
 |---|---|---|
-| MCP proxy (stdio, transparent) | `proxy/` | ✅ built first |
+| MCP proxy (stdio, transparent) | `proxy/` | ✅ |
 | Deterministic PII redaction | `redaction/` | ✅ write-path |
 | SQLite trace store (whole objects) | `store/` | ✅ |
-| Mocked replay + trajectory diff | `replay/` | ✅ pluggable model client |
+| Replay + trajectory diff | `replay/` | ✅ pluggable model client |
 | Python capture SDK | `sdk/` | ✅ OTel GenAI conventions |
 | Local trace-explorer UI | `ui/` | ✅ read-only, FastAPI |
 
-## Design rules (proven in Phase 0, enforced here)
+## Design guarantees
 
 - Proxy forwards raw bytes **unchanged**; only a *copy* is parsed for tracing.
 - Logs go to **stderr / file, never stdout** (stdout is the JSON-RPC channel).
@@ -64,15 +67,45 @@ pip install agentsense-ai            # distribution name; the CLI and import are
 The install/import names differ (like `scikit-learn` → `sklearn`): the package is
 `agentsense-ai`, but you run `agentsense …` and `import agentsense`.
 
+## How it's used
+
+Capture → explore → replay:
+
+1. **Capture a run** — either or both:
+   - *Zero code change:* put the proxy in front of your MCP server ([Quick start](#quick-start)) — it traces every tool call.
+   - *Richer detail:* wrap your own loop with the [capture SDK](#capture-sdk) to also record reasoning and model calls.
+2. **Explore** — `agentsense ui --db traces.db` opens the [trace explorer](#ui-local-trace-explorer): span tree, timeline, PII-redaction badges.
+3. **Replay** — re-run a captured trace against a different model and [diff the trajectory](#replay--trajectory-diff) to see where its decisions change.
+
 ## Quick start
 
-```bash
-uv sync --group dev
+The proxy is a stdio MCP server your client launches, wrapping the real server. Add it to
+your MCP client's config (e.g. Claude Desktop, Cursor):
 
-# Point your MCP client's server config at this command instead of the real server.
-# The proxy forwards transparently and traces to SQLite.
-uv run agentsense proxy --db traces.db -- \
-    npx -y @modelcontextprotocol/server-filesystem /tmp
+```jsonc
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "agentsense",
+      "args": ["proxy", "--db", "traces.db",
+               "--", "npx", "-y", "@modelcontextprotocol/server-filesystem", "/data"]
+    }
+  }
+}
+```
+
+Use your agent as usual, then explore what it did:
+
+```bash
+agentsense ui --db traces.db      # opens http://127.0.0.1:8000
+```
+
+**Just want to see it work now?** Drive it with the MCP Inspector — no config edit:
+
+```bash
+npx @modelcontextprotocol/inspector \
+  agentsense proxy --db traces.db -- npx -y @modelcontextprotocol/server-filesystem /tmp
+# make a tool call in the Inspector, then:  agentsense ui --db traces.db
 ```
 
 ## Tests
@@ -145,11 +178,11 @@ uv run python examples/replay_scripted.py
 # → diverge at decision 0: haiku-4.5 → call get_weather(...) | opus-4.8 → call get_forecast(...)
 ```
 
-The model client is **pluggable behind one adapter** (`replay/adapters/`): `ScriptedAdapter`
-(offline/tests), `BedrockAdapter` (Converse, dev), `OpenAICompatAdapter` (OSS release). The
-engine speaks only provider-neutral types — swapping providers never touches it. Recorded
-tool results can be supplied directly or pulled from a captured proxy trace via
-`Recording.from_trace_store(...)`.
+The model client is **pluggable behind one adapter** (`replay/adapters/`): `BedrockAdapter`
+(AWS Bedrock Converse), `OpenAICompatAdapter` (OpenAI, Ollama, or any OpenAI-compatible
+endpoint), and `ScriptedAdapter` (offline/tests). The engine speaks only provider-neutral
+types — swapping providers never touches it. Recorded tool results can be supplied directly
+or pulled from a captured proxy trace via `Recording.from_trace_store(...)`.
 
 ### Capture → replay (the full loop)
 
@@ -165,8 +198,9 @@ uv run python examples/capture_then_replay.py
 
 ## Model access (live replay only — not needed for the proxy)
 
-Live replay uses AWS Bedrock (Converse API) for dev, OpenAI-compatible for the OSS
-release. Before running the Bedrock example:
+Live replay calls a model, so it needs credentials for whichever provider you pick —
+either an OpenAI-compatible endpoint (`OPENAI_API_KEY`, or a local Ollama base URL) or AWS
+Bedrock. For the Bedrock example:
 
 ```bash
 aws sso login --profile <your-aws-profile>        # temporary SSO creds
