@@ -1,7 +1,7 @@
 """agentsense — MCP-native agent observability & debugging tool.
 
-v0: transparent MCP proxy → deterministic redaction → SQLite trace store.
-Replay engine and Python capture SDK are fast-follow.
+Transparent MCP proxy → deterministic PII redaction → SQLite trace store, plus a
+capture SDK, a mocked replay engine with trajectory diff, and a local trace UI.
 """
 
-__version__ = "0.0.0"
+__version__ = "0.1.1"
