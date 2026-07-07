@@ -14,6 +14,7 @@ redaction noise.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from agentsense.redaction.redactor import redact_object, redact_text
@@ -29,14 +30,34 @@ from agentsense.replay.trajectory import (
 )
 from agentsense.replay.types import ToolResult, Turn
 
+STUB_RESULT = {"agentsense_stub": True, "reason": "no recorded result for this call"}
+_FORK_POLICIES = ("stop", "stub", "live")
+
 
 def replay(
     recording: Recording,
     adapter: ModelAdapter,
     max_steps: int = 12,
     redact: bool = True,
+    on_unrecorded: str = "stop",
+    live_tool: Callable[[str, dict[str, Any]], Any] | None = None,
 ) -> Trajectory:
-    """Replay `recording` against `adapter`. Returns the resulting Trajectory."""
+    """Replay `recording` against `adapter`. Returns the resulting Trajectory.
+
+    When the replayed model requests a tool/args the recording doesn't cover (a
+    trajectory fork), `on_unrecorded` decides what happens — this choice defines
+    what the diff can honestly claim past that point:
+      - "stop"  (default): mark the branch unresolvable and stop. Everything the
+                 replay would do afterwards is unknowable, so nothing downstream is
+                 fabricated.
+      - "stub":  inject a clearly-marked placeholder result and continue. Lets you
+                 see later decisions, but they rest on synthetic input.
+      - "live":  call the real tool via `live_tool` — reintroduces the cost and side
+                 effects mocked replay avoids. Requires a `live_tool` executor.
+    """
+    if on_unrecorded not in _FORK_POLICIES:
+        raise ValueError(f"on_unrecorded must be one of {_FORK_POLICIES}")
+
     turns: list[Turn] = [Turn(role="user", text=recording.question)]
     traj = Trajectory(model_id=adapter.model_id)
 
@@ -64,7 +85,24 @@ def replay(
             )
             found, result = recording.lookup(tc.name, tc.input)
             if not found:
-                # Model went somewhere the recording doesn't cover — a divergence.
+                # The replay forked off the recorded trajectory. Policy decides.
+                if on_unrecorded == "stub":
+                    result = STUB_RESULT
+                    traj.add(Step(kind=TOOL_RESULT, tool_name=tc.name,
+                                  result=_r_obj(result, redact), stubbed=True))
+                    result_turn.append(ToolResult(id=tc.id, name=tc.name, result=result))
+                    continue
+                if on_unrecorded == "live":
+                    if live_tool is None:
+                        raise ValueError(
+                            "on_unrecorded='live' requires a live_tool executor"
+                        )
+                    result = live_tool(tc.name, tc.input)
+                    traj.add(Step(kind=TOOL_RESULT, tool_name=tc.name,
+                                  result=_r_obj(result, redact), live=True))
+                    result_turn.append(ToolResult(id=tc.id, name=tc.name, result=result))
+                    continue
+                # "stop": mark the branch unresolvable and halt (nothing downstream).
                 traj.add(Step(kind=TOOL_RESULT, tool_name=tc.name, missing=True))
                 traj.stopped_reason = "unrecorded_tool_call"
                 return traj

@@ -85,3 +85,54 @@ def test_usage_incl_cache_tokens_captured():
     traj = replay(Recording(question="q"), ScriptedAdapter(script))
     assert traj.total_input_tokens == 10
     assert traj.usages[0].cache_read_input_tokens == 4
+
+
+# ---- fork policies (A2): what happens at an unrecorded tool call --------------
+
+def _fork_script():
+    # Model calls a tool the recording doesn't have, then would answer.
+    return [
+        ModelResponse(tool_calls=[ToolCall(id="t1", name="get_weather",
+                                           input={"city": "Berlin"})]),  # unrecorded
+        ModelResponse(text="done"),
+    ]
+
+
+def test_stop_policy_halts_at_fork():
+    traj = replay(_recording(), ScriptedAdapter(_fork_script()), on_unrecorded="stop")
+    assert traj.stopped_reason == "unrecorded_tool_call"
+    assert traj.steps[-1].kind == TOOL_RESULT and traj.steps[-1].missing
+
+
+def test_stub_policy_continues_with_marked_stub():
+    traj = replay(_recording(), ScriptedAdapter(_fork_script()), on_unrecorded="stub")
+    assert traj.stopped_reason is None
+    stub = next(s for s in traj.steps if s.kind == TOOL_RESULT)
+    assert stub.stubbed and stub.result.get("agentsense_stub")
+    assert traj.steps[-1].kind == FINAL  # it continued to a final answer
+
+
+def test_live_policy_requires_executor():
+    import pytest
+    with pytest.raises(ValueError, match="live_tool"):
+        replay(_recording(), ScriptedAdapter(_fork_script()), on_unrecorded="live")
+
+
+def test_live_policy_calls_executor():
+    calls = []
+
+    def live_tool(name, args):
+        calls.append((name, args))
+        return {"temp_c": 5}
+
+    traj = replay(_recording(), ScriptedAdapter(_fork_script()),
+                  on_unrecorded="live", live_tool=live_tool)
+    assert calls == [("get_weather", {"city": "Berlin"})]
+    live_step = next(s for s in traj.steps if s.kind == TOOL_RESULT and s.live)
+    assert live_step.result == {"temp_c": 5}
+
+
+def test_invalid_policy_rejected():
+    import pytest
+    with pytest.raises(ValueError, match="on_unrecorded"):
+        replay(_recording(), ScriptedAdapter(_fork_script()), on_unrecorded="bogus")

@@ -54,6 +54,8 @@
     .summary { padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; font-size: 12px; }
     .summary.aligned { background: #14251a; color: var(--tool); border: 1px solid #1f4030; }
     .summary.diverge { background: #2a1618; color: #ff8a8a; border: 1px solid #46252a; }
+    .summary.fork { background: #2a2413; color: var(--reason); border: 1px solid #4a3f1e; }
+    .summary.suspect { background: #2a2413; color: var(--reason); border: 1px solid #4a3f1e; margin-top: -6px; }
     .diff-grid { display: grid; grid-template-columns: 40px 1fr 1fr; gap: 8px; align-items: stretch; }
     .diff-head { color: var(--muted); font-size: 11px; padding: 4px 8px; }
     .cell { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
@@ -140,8 +142,12 @@
           <div class="cell ${cellCls} ${lb.cls}">${lb.text}</div>`;
       }
       rows += `</div>`;
-      const cls = d.aligned ? "aligned" : "diverge";
-      return `<div class="summary ${cls}">${d.summary}</div>` + rows;
+      const cls = d.kind === "aligned" ? "aligned"
+        : (d.kind === "unresolvable_fork" ? "fork" : "diverge");
+      const suspect = d.redaction_suspect
+        ? `<div class="summary suspect">⚠ a redacted value is in play before the divergence — it may be caused by redaction, not the model</div>`
+        : "";
+      return `<div class="summary ${cls}">${d.summary}</div>` + suspect + rows;
     }
 
     async function doCompare() {
@@ -160,6 +166,7 @@
         adapter: document.getElementById("rp-adapter").value,
         model,
         base_url: document.getElementById("rp-baseurl").value.trim() || null,
+        on_unrecorded: document.getElementById("rp-policy").value,
       };
       status.textContent = "replaying…";
       const resp = await fetch("/api/replay", {
@@ -228,6 +235,10 @@
           </select>
           <input id="rp-model" placeholder="model id (e.g. gpt-4o-mini)" />
           <input id="rp-baseurl" placeholder="base URL (optional, e.g. Ollama)" />
+          <select id="rp-policy" title="What to do if the replay calls a tool the trace didn't record">
+            <option value="stop">on fork: stop</option>
+            <option value="stub">on fork: stub</option>
+          </select>
           <button onclick="runReplay('${data.trace_id}')">Run replay</button>
           <span id="rp-status" class="rp-status"></span>
         </div>

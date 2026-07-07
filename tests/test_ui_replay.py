@@ -79,3 +79,64 @@ def test_replay_non_replayable_trace_400(tmp_path):
         "/api/replay", json={"trace_id": "proxy1", "model": "gpt-x"})
     assert r.status_code == 400
     assert "recording" in r.json()["detail"]
+
+
+# ---- fork policy + honest diff fields exposed over the API --------------------
+
+from agentsense.replay.types import ToolCall  # noqa: E402
+
+
+class FakeForkAdapter:
+    """Calls an unrecorded tool (get_weather/Berlin — recording has Paris), then answers."""
+
+    def __init__(self, model_id, **kwargs):
+        self.model_id = model_id
+        self._i = 0
+
+    def converse(self, system, turns, tools):
+        self._i += 1
+        if self._i == 1:
+            return ModelResponse(tool_calls=[ToolCall(id="t1", name="get_weather",
+                                                      input={"city": "Berlin"})])
+        return ModelResponse(text="guessed")
+
+
+def test_replay_stub_policy_continues_over_api(tmp_path, monkeypatch):
+    db = tmp_path / "t.db"
+    _seed_sdk_trace(db)
+    monkeypatch.setattr(ui_app, "OpenAICompatAdapter", FakeForkAdapter)
+    client = TestClient(create_app(str(db)))
+
+    r = client.post("/api/replay",
+                    json={"trace_id": "run1", "model": "gpt-x", "on_unrecorded": "stub"})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["replay"]["on_unrecorded"] == "stub"
+    assert d["replay"]["stubbed_calls"] == 1
+    assert d["kind"] == "diverged"          # different args -> a real decision diff
+    assert "comparable_until" in d and "redaction_suspect" in d
+
+
+def test_replay_stop_policy_reports_unresolvable_fork(tmp_path, monkeypatch):
+    db = tmp_path / "t.db"
+    _seed_sdk_trace(db)
+    monkeypatch.setattr(ui_app, "OpenAICompatAdapter", FakeForkAdapter)
+    client = TestClient(create_app(str(db)))
+
+    r = client.post("/api/replay",
+                    json={"trace_id": "run1", "model": "gpt-x", "on_unrecorded": "stop"})
+    d = r.json()
+    assert d["kind"] == "unresolvable_fork"
+    assert d["replay"]["stopped_reason"] == "unrecorded_tool_call"
+
+
+def test_replay_live_without_executor_is_400(tmp_path, monkeypatch):
+    db = tmp_path / "t.db"
+    _seed_sdk_trace(db)
+    monkeypatch.setattr(ui_app, "OpenAICompatAdapter", FakeForkAdapter)
+    client = TestClient(create_app(str(db)))
+
+    r = client.post("/api/replay",
+                    json={"trace_id": "run1", "model": "gpt-x", "on_unrecorded": "live"})
+    assert r.status_code == 400
+    assert "live_tool" in r.json()["detail"]

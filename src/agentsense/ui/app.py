@@ -38,6 +38,7 @@ class ReplayRequest(BaseModel):
     base_url: str | None = None
     api_key: str | None = None
     region: str = "eu-west-1"
+    on_unrecorded: str = "stop"  # fork policy: "stop" | "stub" (UI); "live" needs code
 
 
 def create_app(db_path: str) -> FastAPI:
@@ -85,9 +86,7 @@ def create_app(db_path: str) -> FastAPI:
         return {
             "a": {"trace_id": a, "model_id": ta.model_id, "decisions": _decisions(ta)},
             "b": {"trace_id": b, "model_id": tb.model_id, "decisions": _decisions(tb)},
-            "aligned": result.aligned,
-            "first_divergence": result.first_divergence,
-            "summary": result.summary,
+            **_diff_fields(result),
         }
 
     @app.post("/api/replay")
@@ -120,12 +119,14 @@ def create_app(db_path: str) -> FastAPI:
             )
 
         try:
-            replayed = replay(recording, adapter)
+            replayed = replay(recording, adapter, on_unrecorded=req.on_unrecorded)
         except ModuleNotFoundError as e:  # adapter SDK not installed
             raise HTTPException(
                 status_code=400,
                 detail=f"adapter '{req.adapter}' needs the 'replay' extra ({e.name})",
             ) from e
+        except ValueError as e:  # invalid policy, or "live" without an executor
+            raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:  # noqa: BLE001 - surface model/credential errors to the UI
             raise HTTPException(status_code=502, detail=f"model call failed: {e}") from e
 
@@ -135,12 +136,12 @@ def create_app(db_path: str) -> FastAPI:
                   "decisions": _decisions(captured)},
             "b": {"label": f"replay · {adapter.model_id}",
                   "decisions": _decisions(replayed)},
-            "aligned": result.aligned,
-            "first_divergence": result.first_divergence,
-            "summary": result.summary,
+            **_diff_fields(result),
             "replay": {
                 "model": adapter.model_id,
+                "on_unrecorded": req.on_unrecorded,
                 "stopped_reason": replayed.stopped_reason,
+                "stubbed_calls": sum(1 for s in replayed.steps if s.stubbed),
                 "input_tokens": replayed.total_input_tokens,
                 "output_tokens": replayed.total_output_tokens,
             },
@@ -154,6 +155,18 @@ def create_app(db_path: str) -> FastAPI:
 
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app
+
+
+def _diff_fields(result) -> dict[str, Any]:
+    """Shared diff fields for /api/diff and /api/replay responses."""
+    return {
+        "aligned": result.aligned,
+        "kind": result.kind,  # aligned | diverged | unresolvable_fork
+        "first_divergence": result.first_divergence,
+        "comparable_until": result.comparable_until,
+        "redaction_suspect": result.redaction_suspect,
+        "summary": result.summary,
+    }
 
 
 def _decisions(traj: Trajectory) -> list[dict[str, Any]]:

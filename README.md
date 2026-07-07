@@ -184,6 +184,14 @@ endpoint), and `ScriptedAdapter` (offline/tests). The engine speaks only provide
 types — swapping providers never touches it. Recorded tool results can be supplied directly
 or pulled from a captured proxy trace via `Recording.from_trace_store(...)`.
 
+**Honest about forks and redaction.** The diff is only meaningful up to the first
+divergence — once the replay requests a tool the trace didn't record, the branch forks.
+agentsense makes that explicit: by default it **stops** at the fork (`on_unrecorded="stop"`;
+also `stub` or `live` with an executor), and labels the result `aligned` / `diverged` /
+`unresolvable_fork` with a `comparable_until` marker. And since redaction runs before
+storage, a divergence at a redacted value could be caused by redaction rather than the
+model — those are flagged `redaction_suspect` so you don't misattribute them.
+
 ### Capture → replay (the full loop)
 
 An SDK-captured run replays end-to-end: `Recording.from_sdk_trace(store, trace_id)`

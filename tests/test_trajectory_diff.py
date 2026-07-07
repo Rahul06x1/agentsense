@@ -69,3 +69,71 @@ def test_early_stop_diverges_against_longer_run():
     b = replay(_recording(), ScriptedAdapter(b_script, model_id="opus"))
     d = diff_trajectories(a, b)
     assert not d.aligned and d.first_divergence == 0
+
+
+# ---- A1: honest diff output (kind + comparable_until) -------------------------
+
+from agentsense.replay.diff import ALIGNED, DIVERGED, UNRESOLVABLE_FORK  # noqa: E402
+from agentsense.replay.trajectory import (  # noqa: E402
+    FINAL,
+    TOOL_CALL,
+    TOOL_RESULT,
+    Step,
+    Trajectory,
+)
+
+
+def _traj(model, decisions, stopped_reason=None):
+    t = Trajectory(model_id=model, stopped_reason=stopped_reason)
+    for kind, name, inp, result in decisions:
+        if kind == TOOL_CALL:
+            t.add(Step(kind=TOOL_CALL, tool_name=name, tool_input=inp))
+            t.add(Step(kind=TOOL_RESULT, tool_name=name, result=result,
+                       missing=result is None))
+        else:
+            t.add(Step(kind=FINAL, text="done"))
+    return t
+
+
+def test_aligned_kind():
+    a = _traj("m1", [(TOOL_CALL, "w", {"c": "P"}, {"t": 1}), (FINAL, None, None, None)])
+    b = _traj("m2", [(TOOL_CALL, "w", {"c": "P"}, {"t": 1}), (FINAL, None, None, None)])
+    d = diff_trajectories(a, b)
+    assert d.kind == ALIGNED and d.comparable_until == 2 and not d.redaction_suspect
+
+
+def test_clean_divergence_kind():
+    a = _traj("m1", [(TOOL_CALL, "get_weather", {"c": "P"}, {"t": 1})])
+    b = _traj("m2", [(TOOL_CALL, "get_forecast", {"c": "P"}, {"d": 3})])
+    d = diff_trajectories(a, b)
+    assert d.kind == DIVERGED and d.first_divergence == 0 and d.comparable_until == 0
+
+
+def test_unresolvable_fork_kind():
+    # b requested an unrecorded tool and stopped — downstream is uncomparable.
+    a = _traj("m1", [(TOOL_CALL, "get_weather", {"c": "Paris"}, {"t": 1}),
+                     (FINAL, None, None, None)])
+    b = _traj("m2", [(TOOL_CALL, "get_weather", {"c": "Berlin"}, None)],
+              stopped_reason="unrecorded_tool_call")
+    d = diff_trajectories(a, b)
+    assert d.kind == UNRESOLVABLE_FORK
+    assert d.first_divergence == 0
+    assert "unresolvable fork" in d.summary
+
+
+def test_redaction_suspect_flag():
+    # A redacted token in the inputs before the divergence -> flagged suspect.
+    a = _traj("m1", [(TOOL_CALL, "send", {"to": "<EMAIL_1a2b3c4d>"}, {"ok": 1}),
+                     (TOOL_CALL, "get_weather", {"c": "P"}, {"t": 1})])
+    b = _traj("m2", [(TOOL_CALL, "send", {"to": "<EMAIL_1a2b3c4d>"}, {"ok": 1}),
+                     (TOOL_CALL, "get_forecast", {"c": "P"}, {"d": 3})])
+    d = diff_trajectories(a, b)
+    assert d.kind == DIVERGED and d.first_divergence == 1
+    assert d.redaction_suspect is True
+    assert "redaction" in d.summary
+
+
+def test_no_redaction_no_suspect():
+    a = _traj("m1", [(TOOL_CALL, "get_weather", {"c": "P"}, {"t": 1})])
+    b = _traj("m2", [(TOOL_CALL, "get_forecast", {"c": "P"}, {"d": 3})])
+    assert diff_trajectories(a, b).redaction_suspect is False

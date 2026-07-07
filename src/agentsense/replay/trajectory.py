@@ -25,7 +25,9 @@ class Step:
     tool_name: str | None = None
     tool_input: dict[str, Any] | None = None
     result: Any = None
-    missing: bool = False
+    missing: bool = False  # tool_result the recording didn't cover (fork, policy=stop)
+    stubbed: bool = False  # synthetic placeholder result (policy=stub)
+    live: bool = False  # result from a real live tool call (policy=live)
 
 
 @dataclass
