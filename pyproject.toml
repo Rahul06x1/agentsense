@@ -2,7 +2,7 @@
 # PyPI distribution name (import package and CLI stay `agentsense`); the bare
 # `agentsense` name is blocked on PyPI as too similar to the existing `agent-sense`.
 name = "agentsense-ai"
-version = "0.1.3"
+version = "0.1.4"
 description = "Make sense of what your AI agents did — local-first, MCP-native observability, trace replay & trajectory diff."
 readme = "README.md"
 requires-python = ">=3.11"
