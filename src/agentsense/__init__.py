@@ -4,4 +4,4 @@ Transparent MCP proxy → deterministic PII redaction → SQLite trace store, pl
 capture SDK, a mocked replay engine with trajectory diff, and a local trace UI.
 """
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
