@@ -43,3 +43,47 @@ def test_same_object_redacts_identically_across_runs():
     r1, _ = redact_object(obj)
     r2, _ = redact_object(obj)
     assert r1 == r2  # deterministic at the object level -> replay aligns
+
+
+def test_iso_dates_are_not_mistaken_for_phone_numbers():
+    """Dates are digit/hyphen runs the phone detector used to swallow.
+
+    Regression: found by tracing a real MCP session. Left unguarded this fires on
+    every trace ever captured (`initialize` always carries a protocolVersion date)
+    and mangles timestamps inside tool results, which in turn trips the replay
+    diff's `redaction_suspect` flag on runs where nothing was actually redacted.
+    """
+    for value in ("2024-11-05", "2025-06-11", "2024-11-05T14:30:00Z", "0.2.0"):
+        redacted, audit = redact_text(value)
+        assert redacted == value, f"{value!r} was rewritten to {redacted!r}"
+        assert audit == []
+
+
+def test_initialize_response_redacts_to_nothing():
+    """The exact payload that exposed the bug: a clean handshake must stay clean."""
+    obj = {
+        "result": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {"tools": {"listChanged": True}},
+            "serverInfo": {"name": "secure-filesystem-server", "version": "0.2.0"},
+        },
+        "jsonrpc": "2.0",
+        "id": 0,
+    }
+    redacted, audit = redact_object(obj)
+    assert redacted == obj
+    assert audit == []
+
+
+def test_real_phone_numbers_still_redacted():
+    """The date guard must not cost us the detections the guard exists to protect."""
+    for value in ("+1 415 555 0100", "+44 7700 900123", "415-555-0100"):
+        redacted, audit = redact_text(value)
+        assert "<PHONE_" in redacted
+        assert [kind for kind, _ in audit] == ["phone"]
+
+    # A date sitting next to a phone number must not shield it.
+    redacted, audit = redact_text("on 2024-11-05 call +44 7700 900123")
+    assert "2024-11-05" in redacted
+    assert "900123" not in redacted
+    assert [kind for kind, _ in audit] == ["phone"]
