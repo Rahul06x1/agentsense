@@ -51,6 +51,11 @@ def _key(step: Step) -> tuple:
     return (step.kind,)
 
 
+def _side_name(traj: Trajectory, fallback: str) -> str:
+    """What to call one side in the summary: its model, else its client, else A/B."""
+    return traj.model_id or traj.label or fallback
+
+
 def _describe(step: Step | None) -> str:
     if step is None:
         return "∅ (no step)"
@@ -96,8 +101,8 @@ def diff_trajectories(a: Trajectory, b: Trajectory) -> TrajectoryDiff:
             suspect = _redaction_in_play(a, b, i)
             summary = (
                 f"diverge at decision {i}: "
-                f"{a.model_id or 'A'} → {_describe(step_a)} | "
-                f"{b.model_id or 'B'} → {_describe(step_b)}"
+                f"{_side_name(a, 'A')} → {_describe(step_a)} | "
+                f"{_side_name(b, 'B')} → {_describe(step_b)}"
             )
             if kind == UNRESOLVABLE_FORK:
                 summary += (

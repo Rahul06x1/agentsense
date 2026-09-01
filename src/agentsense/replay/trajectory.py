@@ -33,6 +33,11 @@ class Step:
 @dataclass
 class Trajectory:
     model_id: str | None = None
+    #: Display name for the side that produced this run, when it isn't a model.
+    #: A proxy trace has no llm_call span to name, so it labels itself with the
+    #: MCP client that made the calls. Kept separate from `model_id` so the API
+    #: never reports a client name as if it were a model.
+    label: str | None = None
     steps: list[Step] = field(default_factory=list)
     usages: list[Usage] = field(default_factory=list)
     final_text: str = ""

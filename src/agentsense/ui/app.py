@@ -84,8 +84,10 @@ def create_app(db_path: str) -> FastAPI:
             store.close()
         result = diff_trajectories(ta, tb)
         return {
-            "a": {"trace_id": a, "model_id": ta.model_id, "decisions": _decisions(ta)},
-            "b": {"trace_id": b, "model_id": tb.model_id, "decisions": _decisions(tb)},
+            "a": {"trace_id": a, "model_id": ta.model_id, "label": ta.label,
+                  "decisions": _decisions(ta)},
+            "b": {"trace_id": b, "model_id": tb.model_id, "label": tb.label,
+                  "decisions": _decisions(tb)},
             **_diff_fields(result),
         }
 
