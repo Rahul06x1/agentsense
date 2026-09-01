@@ -9,7 +9,8 @@ an error, so nothing surfaced the loss.
 
 from agentsense.model.spans import Span
 from agentsense.replay import captured_trajectory, diff_trajectories
-from agentsense.replay.trajectory import FINAL, TOOL_CALL
+from agentsense.replay.diff import UNKNOWN_TERMINAL
+from agentsense.replay.trajectory import TOOL_CALL
 from agentsense.sdk import Tracer
 from agentsense.store.sqlite import SpanStore
 
@@ -55,7 +56,9 @@ def test_proxy_tool_calls_become_decisions(tmp_path):
     traj = captured_trajectory(store, "p1")
     decisions = traj.decisions
 
-    assert [d.kind for d in decisions] == [TOOL_CALL, TOOL_CALL, FINAL]
+    # No trailing `final`: the proxy watches the wire and never sees the model
+    # answer, so claiming the run ended here would be an invention.
+    assert [d.kind for d in decisions] == [TOOL_CALL, TOOL_CALL]
     assert [d.tool_name for d in decisions[:2]] == ["read_text_file", "get_file_info"]
     # Arguments come from params.arguments, not the SDK's flat request.arguments.
     assert decisions[0].tool_input == {"path": "README.md"}
@@ -68,7 +71,7 @@ def test_handshake_traffic_is_not_a_decision(tmp_path):
     _proxy_handshake(store, "p2")
 
     traj = captured_trajectory(store, "p2")
-    assert [d.kind for d in traj.decisions] == [FINAL]
+    assert traj.decisions == []
     store.close()
 
 
@@ -101,16 +104,22 @@ def test_same_tool_calls_with_different_arguments_diverge(tmp_path):
     store.close()
 
 
-def test_identical_proxy_traces_still_align(tmp_path):
-    """The fix must not turn every comparison into a divergence."""
+def test_identical_proxy_traces_match_but_are_not_claimed_aligned(tmp_path):
+    """Same calls, but neither ending was captured — so not "identical trajectory".
+
+    The fix must not turn this into a divergence either: there is no
+    `first_divergence`, and every observed decision matched.
+    """
     store = SpanStore(tmp_path / "t.db")
     for trace_id in ("a", "b"):
         _proxy_handshake(store, trace_id)
         _proxy_call(store, trace_id, "read_text_file", {"path": "README.md"}, {"text": "hi"})
 
     d = diff_trajectories(captured_trajectory(store, "a"), captured_trajectory(store, "b"))
-    assert d.aligned
+    assert d.kind == UNKNOWN_TERMINAL
     assert d.first_divergence is None
+    assert d.comparable_until == 1
+    assert "either run" in d.summary  # not "claude-code, claude-code"
     store.close()
 
 
@@ -125,11 +134,11 @@ def test_failed_tool_call_is_still_a_decision(tmp_path):
     _proxy_call(store, "err", "read_text_file", {"path": "nope.md"}, result=None)
 
     traj = captured_trajectory(store, "err")
-    assert [d.kind for d in traj.decisions] == [TOOL_CALL, FINAL]
+    assert [d.kind for d in traj.decisions] == [TOOL_CALL]
     assert traj.decisions[0].tool_name == "read_text_file"
-    # Same decision, different outcome -> the trajectories still align.
+    # Same decision, different outcome -> no divergence between them.
     d = diff_trajectories(captured_trajectory(store, "ok"), traj)
-    assert d.aligned
+    assert d.first_divergence is None
     store.close()
 
 

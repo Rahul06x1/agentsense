@@ -188,7 +188,10 @@ or pulled from a captured proxy trace via `Recording.from_trace_store(...)`.
 divergence — once the replay requests a tool the trace didn't record, the branch forks.
 agentsense makes that explicit: by default it **stops** at the fork (`on_unrecorded="stop"`;
 also `stub` or `live` with an executor), and labels the result `aligned` / `diverged` /
-`unresolvable_fork` with a `comparable_until` marker. And since redaction runs before
+`unresolvable_fork` with a `comparable_until` marker. The same applies to endings:
+a run is only credited with finishing if an answer was actually captured (the proxy
+watches the wire, so it never sees one), and comparing past a missing ending is
+reported as `unknown_terminal` instead of a false `aligned`. And since redaction runs before
 storage, a divergence at a redacted value could be caused by redaction rather than the
 model — those are flagged `redaction_suspect` so you don't misattribute them.
 

@@ -24,6 +24,21 @@ from agentsense.model.spans import LLM_CALL, MCP_CALL
 from agentsense.model.spans import TOOL_CALL as SPAN_TOOL_CALL
 from agentsense.replay.trajectory import FINAL, MODEL_TEXT, TOOL_CALL, Step, Trajectory
 
+# A turn that asked for tools is the model continuing, not ending. Everything
+# else it can report (end_turn / stop / max_tokens / length / stop_sequence /
+# content_filter) means the run demonstrably stopped -- even where the agent
+# didn't choose to, there is nothing further to compare against.
+_CONTINUING_FINISH_REASONS = frozenset({"tool_use", "tool_calls"})
+_FINISH_REASONS_ATTR = "gen_ai.response.finish_reasons"
+
+
+def _finish_reasons(span) -> list[str]:
+    """The recorded finish reasons, tolerating a bare string as well as a list."""
+    raw = span.attributes.get(_FINISH_REASONS_ATTR)
+    if isinstance(raw, str):
+        return [raw]
+    return [r for r in (raw or []) if isinstance(r, str)]
+
 
 def _client_label(spans) -> str | None:
     """Name the MCP client from the handshake, for traces with no model to name.
@@ -50,7 +65,7 @@ def captured_trajectory(store, trace_id: str) -> Trajectory:
     # Only for traces with no model of their own — an SDK run names its model.
     label = _client_label(spans) if model_id is None else None
     traj = Trajectory(model_id=model_id, label=label)
-    last_answer = ""
+    ended, final_text = False, ""
     for s in spans:
         if s.kind == SPAN_TOOL_CALL:
             traj.add(
@@ -70,10 +85,26 @@ def captured_trajectory(store, trace_id: str) -> Trajectory:
             )
         elif s.kind == LLM_CALL:
             text = ((s.response or {}).get("response") or {}).get("text", "")
-            if isinstance(text, str) and text:
-                last_answer = text
+            if not isinstance(text, str):
+                text = ""
+            if text:
                 traj.add(Step(kind=MODEL_TEXT, text=text))
+            # The *last* llm_call decides how the run ended, so each one overwrites.
+            # Presence of text is not the signal: "Let me check the weather." before
+            # a tool call is mid-turn narration, and a run can end without saying
+            # anything at all.
+            reasons = _finish_reasons(s)
+            ended = bool(reasons) and not any(
+                r in _CONTINUING_FINISH_REASONS for r in reasons
+            )
+            final_text = text if ended else ""
 
-    traj.final_text = last_answer
-    traj.add(Step(kind=FINAL, text=last_answer))
+    # Only claim a terminal when one was actually observed. The proxy watches the
+    # wire, not the model, so it never sees an ending; a truncated capture has none;
+    # and with no finish_reason recorded we genuinely don't know. Inventing one made
+    # a cut-off run compare as equal to one that finished -- the exact overclaim
+    # `comparable_until` exists to prevent.
+    traj.final_text = final_text
+    if ended:
+        traj.add(Step(kind=FINAL, text=final_text))
     return traj

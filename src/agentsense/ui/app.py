@@ -163,7 +163,7 @@ def _diff_fields(result) -> dict[str, Any]:
     """Shared diff fields for /api/diff and /api/replay responses."""
     return {
         "aligned": result.aligned,
-        "kind": result.kind,  # aligned | diverged | unresolvable_fork
+        "kind": result.kind,  # aligned | diverged | unresolvable_fork | unknown_terminal
         "first_divergence": result.first_divergence,
         "comparable_until": result.comparable_until,
         "redaction_suspect": result.redaction_suspect,

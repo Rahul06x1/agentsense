@@ -131,11 +131,14 @@ def test_sdk_diff_still_reports_model_id(tmp_path):
     assert d["a"]["label"] is None
 
 
-def test_proxy_traces_with_identical_calls_align(tmp_path):
+def test_proxy_traces_with_identical_calls_match_without_claiming_aligned(tmp_path):
+    """Same calls, but the proxy never sees an ending — so bounded, not "identical"."""
     r = _proxy_client(tmp_path).get("/api/diff", params={"a": "px_read", "b": "px_read_2"})
     d = r.json()
-    assert d["aligned"] is True
-    assert d["first_divergence"] is None
+    assert d["kind"] == "unknown_terminal"
+    assert d["aligned"] is False
+    assert d["first_divergence"] is None  # nothing observed actually conflicted
+    assert d["comparable_until"] == 1
     assert d["a"]["decisions"][0]["tool_name"] == "read_text_file"
 
 
@@ -153,4 +156,8 @@ def test_proxy_and_sdk_traces_compare_on_equal_footing(tmp_path):
     # Same tool + same arguments from either capture path -> the same decision.
     assert d["a"]["decisions"][0]["tool_name"] == "get_weather"
     assert d["b"]["decisions"][0]["tool_name"] == "get_weather"
-    assert d["aligned"] is True
+    # The SDK run answered; the proxy run's ending was never observed. Whether the
+    # proxied agent would also have stopped there is unknowable, so the comparison
+    # is bounded rather than declared aligned.
+    assert d["kind"] == "unknown_terminal"
+    assert d["comparable_until"] == 1

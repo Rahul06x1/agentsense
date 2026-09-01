@@ -62,6 +62,7 @@
     .cell.same { opacity: .7; }
     .cell.diverge { border-color: #a33; background: #2a1618; }
     .cell.missing { color: var(--muted); font-style: italic; }
+    .cell.unknown { border-color: #4a3f1e; background: #2a2413; opacity: .8; }
     .idx { color: var(--muted); text-align: right; padding: 6px 4px; }
     .idx.diverge { color: #ff8a8a; font-weight: 700; }
     .replay-box { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
@@ -132,18 +133,26 @@
         <div class="diff-head"></div>
         <div class="diff-head">${headA}</div>
         <div class="diff-head">${headB}</div>`;
+      // Past `comparable_until` on an unknown ending we genuinely don't know what
+      // happened -- mark those rows unknown rather than same or divergent.
+      const unknownFrom = d.kind === "unknown_terminal" ? d.comparable_until : null;
       for (let i = 0; i < n; i++) {
         const la = decisionLabel(d.a.decisions[i]);
         const lb = decisionLabel(d.b.decisions[i]);
         const isDiv = i === div;
-        const cellCls = isDiv ? "diverge" : (div === null || i < div ? "same" : "");
+        const isUnknown = unknownFrom !== null && i >= unknownFrom;
+        const cellCls = isDiv ? "diverge"
+          : isUnknown ? "unknown"
+          : (div === null || i < div ? "same" : "");
         rows += `<div class="idx ${isDiv ? "diverge" : ""}">${i}</div>
           <div class="cell ${cellCls} ${la.cls}">${la.text}</div>
           <div class="cell ${cellCls} ${lb.cls}">${lb.text}</div>`;
       }
       rows += `</div>`;
+      // unknown_terminal is uncertainty, not divergence — style it like a fork.
       const cls = d.kind === "aligned" ? "aligned"
-        : (d.kind === "unresolvable_fork" ? "fork" : "diverge");
+        : (d.kind === "unresolvable_fork" || d.kind === "unknown_terminal"
+           ? "fork" : "diverge");
       const suspect = d.redaction_suspect
         ? `<div class="summary suspect">⚠ a redacted value is in play before the divergence — it may be caused by redaction, not the model</div>`
         : "";
