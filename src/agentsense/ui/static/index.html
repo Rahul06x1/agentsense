@@ -104,9 +104,17 @@
       else detail.innerHTML = '<div class="empty">select a trace</div>';
     }
 
+    function traceOptionLabel(t) {
+      const name = t.name || t.trace_id.slice(0, 12);
+      // A trace with no tool calls has no decisions, so comparing it can only
+      // report "nothing to compare". Say that here rather than in the result.
+      if (!t.tool_calls) return `${name} · no tool calls`;
+      return `${name} · ${t.tool_calls} tool${t.tool_calls === 1 ? "" : "s"}`;
+    }
+
     function renderCompare(detail) {
       const opts = allTraces.map(t =>
-        `<option value="${t.trace_id}">${t.name || t.trace_id}</option>`).join("");
+        `<option value="${t.trace_id}">${traceOptionLabel(t)}</option>`).join("");
       detail.innerHTML = `
         <div class="cmp-controls">
           <span>A</span><select id="cmp-a">${opts}</select>
@@ -114,7 +122,15 @@
           <button onclick="doCompare()">Compare trajectories</button>
         </div>
         <div id="cmp-result"><div class="empty">pick two traces and compare</div></div>`;
-      if (allTraces[1]) document.getElementById("cmp-b").selectedIndex = 1;
+      // Default to traces that actually have decisions — an empty proxy trace is
+      // created every time the MCP server launches, so they can outnumber the real
+      // ones and make the default pairing look broken. Rank rather than filter, so
+      // a db with only one non-empty trace still puts it on side A.
+      const ranked = allTraces
+        .map((t, i) => i)
+        .sort((x, y) => (allTraces[y].tool_calls > 0) - (allTraces[x].tool_calls > 0));
+      document.getElementById("cmp-a").selectedIndex = ranked[0] ?? 0;
+      document.getElementById("cmp-b").selectedIndex = ranked[1] ?? ranked[0] ?? 0;
     }
 
     function decisionLabel(d) {
